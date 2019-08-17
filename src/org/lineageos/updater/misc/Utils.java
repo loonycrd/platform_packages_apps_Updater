@@ -15,6 +15,7 @@
  */
 package org.lineageos.updater.misc;
 
+import android.app.AlarmManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -94,6 +95,10 @@ public class Utils {
     }
 
     public static boolean isCompatible(UpdateBaseInfo update) {
+        if (update.getVersion().compareTo(SystemProperties.get(Constants.PROP_BUILD_VERSION)) < 0) {
+            Log.d(TAG, update.getName() + " is older than current Android version");
+            return false;
+        }
         if (!SystemProperties.getBoolean(Constants.PROP_UPDATER_ALLOW_DOWNGRADING, false) &&
                 update.getTimestamp() <= SystemProperties.getLong(Constants.PROP_BUILD_DATE, 0)) {
             Log.d(TAG, update.getName() + " is older than/equal to the current build");
@@ -159,6 +164,12 @@ public class Utils {
 
         return serverUrl.replace("{device}", device)
                 .replace("{type}", type);
+    }
+
+    public static String getUpgradeBlockedURL(Context context) {
+        String device = SystemProperties.get(Constants.PROP_NEXT_DEVICE,
+                SystemProperties.get(Constants.PROP_DEVICE));
+        return context.getString(R.string.blocked_update_info_url, device);
     }
 
     public static String getChangelogURL(Context context) {
@@ -367,5 +378,27 @@ public class Utils {
     public static boolean isEncrypted(Context context, File file) {
         StorageManager sm = (StorageManager) context.getSystemService(Context.STORAGE_SERVICE);
         return sm.isEncrypted(file);
+    }
+
+    public static int getUpdateCheckSetting(Context context) {
+        SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        return preferences.getInt(Constants.PREF_AUTO_UPDATES_CHECK_INTERVAL,
+                Constants.AUTO_UPDATES_CHECK_INTERVAL_WEEKLY);
+    }
+
+    public static boolean isUpdateCheckEnabled(Context context) {
+        return getUpdateCheckSetting(context) != Constants.AUTO_UPDATES_CHECK_INTERVAL_NEVER;
+    }
+
+    public static long getUpdateCheckInterval(Context context) {
+        switch (Utils.getUpdateCheckSetting(context)) {
+            case Constants.AUTO_UPDATES_CHECK_INTERVAL_DAILY:
+                return AlarmManager.INTERVAL_DAY;
+            case Constants.AUTO_UPDATES_CHECK_INTERVAL_WEEKLY:
+            default:
+                return AlarmManager.INTERVAL_DAY * 7;
+            case Constants.AUTO_UPDATES_CHECK_INTERVAL_MONTHLY:
+                return AlarmManager.INTERVAL_DAY * 30;
+        }
     }
 }
